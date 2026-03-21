@@ -5,11 +5,11 @@ void setup() {
   frameRate(30);
   
   //int N = 10000;  // No. particles
-  int N = 100;
-  int s = 7;  // Size of particle
+  int N = 3000;
+  float s = 1;  // Size of particle
   particles = new Particle[N];
   for (int i = 0; i < N; i++) {
-    particles[i] = new Particle(0, 0, s, 5);
+    particles[i] = new Particle(0, 0, s, 1);
   }
 }
 
@@ -40,6 +40,10 @@ void draw() {
       }
     }
   }
+  
+  if (mousePressed) {
+    mouseInfluence();
+  }
 
   // For particles that didn't collide, continue their trajectory
   for (Particle p : particles) {
@@ -49,5 +53,21 @@ void draw() {
   // Display particles
   for (Particle p : particles) {
     p.draw();
+  }
+}
+
+void mouseInfluence() {
+  float strength = 1;
+  PVector mouse = new PVector(mouseX-width/2f, mouseY-height/2f);
+  
+  if (mouseButton == LEFT) {
+    for (Particle p : particles) {
+      p.attractTo(mouse, strength);
+    }
+    
+  } else if (mouseButton == RIGHT) {
+    for (Particle p : particles) {
+      p.repelFrom(mouse, strength);
+    }
   }
 }

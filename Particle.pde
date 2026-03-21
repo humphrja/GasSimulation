@@ -1,5 +1,5 @@
 class Particle {
-  PVector pos, vel;    // Current position and velocity
+  PVector pos, vel, acc;    // Current position, velocity and acceleration
   PVector nextPos;     // Position of this particle in one frame
   float radius;
   float mass;
@@ -7,9 +7,14 @@ class Particle {
   // Used to skip updating velocity after collision twice to one particle
   boolean particleCollisionApplied = false;
   
+  // 1.00 represents a perfectly elastic collision. Anything less represents energy losses
+  float collisionElasticity = 0.95;
+  
   public Particle(float x, float y, float size, float speed) {
+    this.acc = new PVector(0,0);
+    
     //this.pos = new PVector(x, y);
-    this.pos = PVector.random2D().mult(200);
+    this.pos = PVector.random2D().mult(100);
     
     this.vel = PVector.random2D();    // Unit vector with random direction
     this.vel.setMag(speed);
@@ -29,6 +34,29 @@ class Particle {
     particleCollisionApplied = false;
   }
   
+  public void addForce(PVector force) {
+    this.acc.add(force.div(this.mass));
+  }
+  
+  public void attractTo(PVector target, float baseStrength) {
+    PVector r = PVector.sub(target, this.pos);
+    float strength = baseStrength / r.magSq();
+    PVector force = r.mult(strength);
+    addForce(force);
+  }
+  
+  public void repelFrom(PVector target, float baseStrength) {
+    PVector r = PVector.sub(this.pos, target);
+    float strength = baseStrength / r.magSq();
+    PVector force = r.mult(strength);
+    addForce(force);
+  }
+  
+  //public void drag() {
+  //  // Adds a resistive force that opposes and is proportional to their speed
+  //}
+  
+  //public void update(float wallVelX, float wallVelY, float centerX, float centerY) {
   public void update() {
     // Check for wall collisions
     boolean wallCollisionApplied = false;
@@ -55,6 +83,8 @@ class Particle {
       wallCollisionApplied = true;
     }
     
+    vel.add(acc);
+    
     if (!wallCollisionApplied && !particleCollisionApplied) {
       // Only increment position if it was not set manually after a collision
       pos.add(vel);
@@ -68,6 +98,8 @@ class Particle {
     // Update prediction of next position for next frame's collision calculations
     nextPos = PVector.add(pos, vel);
       // Static method is used so as not to update the position vector
+      
+    this.acc.setMag(0);
   }
   
   public PVector velocityAfterCollision(Particle other) {
@@ -85,7 +117,7 @@ class Particle {
     PVector proj_dVel_onto_dPos = dPosNorm.mult(scalarProj);
     
     proj_dVel_onto_dPos.mult(2*this.mass / (this.mass + other.mass) );
-    return PVector.sub(this.vel, proj_dVel_onto_dPos);
+    return PVector.sub(this.vel, proj_dVel_onto_dPos).mult(this.collisionElasticity);
   }
   
   public float timeOfCollision(Particle other, float timestep) {
