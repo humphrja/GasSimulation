@@ -8,12 +8,11 @@ class Particle {
   boolean particleCollisionApplied = false;
   
   // 1.00 represents a perfectly elastic collision. Anything less represents energy losses
-  float collisionElasticity = 0.95;
+  float collisionElasticity = 1;
   
-  public Particle(float x, float y, float size, float speed) {
+  public Particle(float size, float speed) {
     this.acc = new PVector(0,0);
     
-    //this.pos = new PVector(x, y);
     this.pos = PVector.random2D().mult(100);
     
     this.vel = PVector.random2D();    // Unit vector with random direction
@@ -22,10 +21,17 @@ class Particle {
     this.nextPos = PVector.add(pos, vel);
     
     this.radius = size;
-    this.mass = 1;
+    this.mass = size*size;
     // Extension could be to determine mass from radius given constant density and have a variety of different sized particles interact
   }
 
+  public Particle(float x, float y, float size, float speed) {
+    this(size, speed);
+    
+    this.pos = new PVector(x, y);
+    this.nextPos = PVector.add(pos,vel);
+  }
+  
   public void draw() {
     noStroke();
     fill(255);
@@ -57,7 +63,7 @@ class Particle {
   //}
   
   //public void update(float wallVelX, float wallVelY, float centerX, float centerY) {
-  public void update() {
+  public void update(Box box) {
     // Check for wall collisions
     boolean wallCollisionApplied = false;
     
@@ -66,19 +72,29 @@ class Particle {
     float wallY = pos.y;
     
     // Check walls
-    if (abs(nextPos.x) >= width/2f - radius) {
+    float maxX = box.boxWidth/2f - radius;
+    if (abs(nextPos.x - box.xMed) >= maxX) {
       // Set position to border the interior side of the wall
-      wallX = Math.signum(nextPos.x)*(width/2f - radius);
+      wallX = Math.signum(nextPos.x)*maxX;
       // To get appropriate y value at collision, assume linear interpolation of x, between current and next positions and apply to y
-      wallY = map(wallX, pos.x, nextPos.x, pos.y, nextPos.y);
+      if (nextPos.x == pos.x) {
+        wallY = pos.y;
+      } else {
+        wallY = map(wallX, pos.x, nextPos.x, pos.y, nextPos.y);
+      }
       // Reflect velocity
       vel.x *= -1;
       wallCollisionApplied = true;
     }
     
-    if (abs(nextPos.y) >= height/2f - radius) {
-      wallY = Math.signum(nextPos.y)*(height/2f - radius);
-      wallX = map(wallY, pos.y, nextPos.y, pos.x, nextPos.x);
+    float maxY = box.boxHeight/2f - radius;
+    if (abs(nextPos.y - box.yMed) >= maxY) {
+      wallY = Math.signum(nextPos.y)*maxY;
+      if (nextPos.y == pos.y) {
+        wallX = pos.x;
+      } else {
+        wallX = map(wallY, pos.y, nextPos.y, pos.x, nextPos.x);
+      }
       vel.y *= -1;
       wallCollisionApplied = true;
     }
