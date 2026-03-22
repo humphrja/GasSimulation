@@ -4,36 +4,45 @@ import java.util.Map;
 Particle[] particles;
 Box systemBox;
 
-GPlot plot;
+GPlot velHist;      // Velocity histogram for Maxwellian distribution
+GPlot maxwellPlot;      // Maxwellian distribution overlaid onto histogram
+GPlot tempPlot;     // Temperature-time plot
+GPlot collPlot;     // Collisions-time plot
+GPlot velScatter;      // Collisions
+GPlot freqScatter;     // No. particles in modal bin: Peak of Maxwellian
+
 
 int numCollisions;
 
-float systemX = 300;
-float systemY = 300;
+float BoltzmannConstant = 1;
 
-//float pWinX, pWinY, dWinX, dWinY;
-//float winOriginX, winOriginY;
-
-//import javax.swing.JFrame;
-//import processing.awt.PSurfaceAWT;
-
-//JFrame frame;
+// Dimensions for each window cell to fit on the canvas
+int numRows = 2;
+int numCols = 3;
+PVector[][] windowGrid = new PVector[numRows][numCols];        // 2x2 array containing vector (x,y) for center points
+float winWidth, winHeight;
+float margin = 5;              // Distance between window cell and grid border
 
 void setup() {
-  size(1200,600);
+  size(1350,900);
   frameRate(30);
-  //windowMove(400,200);
   
-  //PSurfaceAWT.SmoothCanvas canvas = (PSurfaceAWT.SmoothCanvas) surface.getNative();
-  //// Get the JFrame which contains the canvas
-  //frame = (JFrame) canvas.getFrame();
+  // Allocate dimensions for a 2x2 window grid
+  float cellWidth = (width/((float) numCols));
+  float cellHeight = (height/((float) numRows));
+  winWidth = cellWidth - 2*margin;
+  winHeight = cellHeight - 2*margin;
   
-  //pWinX = frame.getX();
-  //pWinY = frame.getY();
-  //winOriginX = pWinX;
-  //winOriginY = pWinY;
+  for (int r = 0; r < numRows; r++) {
+    for (int c = 0; c < numCols; c++) {
+      windowGrid[r][c] = new PVector(
+        cellWidth/2f + c*cellWidth,
+        cellHeight/2f + r*cellHeight
+      );
+    }
+  }
   
-  systemBox = new Box(-90, -90, 90, 90);
+  systemBox = new Box(0, 0, winWidth/3f, winHeight/3f);
   
   //int N = 10000;  // No. particles
   int N = 2000;
@@ -45,35 +54,83 @@ void setup() {
     particles[i] = new Particle(randX, randY, s, 0.02);
   }
   
-  plot = new GPlot(this);
-  plot.setPos(610, 10);
-  plot.setDim(480, 480);
-  plot.setYLim(0, N);
+  // Create histogram for Maxwellian distribution
+  velHist = new GPlot(this);
+  velHist.setPos(windowGrid[1][0].x - winWidth/2f, windowGrid[1][0].y - winHeight/2f);
+  // Sets margins outside of plot for axes
+  velHist.setMar(60,60,40,60);
+  // Plot dimensions onlys
+  velHist.setDim(winWidth - 120, winHeight - 100);
+  //velHist.setYLim(0, N);
+  velHist.setYLim(0, 1);
+  velHist.setXLim(0, 10);
+    
+  String title = String.format("Comparing simulated and theoretical\nvelocity distributions for %d particles.", N);
+  velHist.setTitleText(title);
+  velHist.getXAxis().setAxisLabelText("Particle velocity (px/frame)");
+  velHist.getYAxis().setAxisLabelText("Relative frequency per velocity bin (frame/px)");
   
-  plot.setTitleText("Example plot");
-  plot.getXAxis().setAxisLabelText("Particle velocity (px/frame)");
-  plot.getYAxis().setAxisLabelText("Probability");
+  velHist.startHistograms(GPlot.VERTICAL);
   
-  plot.startHistograms(GPlot.VERTICAL);
+  maxwellPlot = new GPlot(this);
+  maxwellPlot.setPos(windowGrid[1][0].x - winWidth/2f, windowGrid[1][0].y - winHeight/2f);
+  maxwellPlot.setMar(60,60,40,60);
+  maxwellPlot.setDim(winWidth - 120, winHeight - 100);
+  maxwellPlot.getRightAxis().setAxisLabelText("Theoretical Probability");
+  maxwellPlot.getRightAxis().setDrawTickLabels(true);
+  maxwellPlot.setYLim(0,1);
+  maxwellPlot.setXLim(0, 10);
+  
+  
+  // Create time plots with multiple series
+  // One with the peak count value of the histogram
+  // One with peak velocity over time
+  // Maybe one to verify total no. particles over time
+  
+  tempPlot = new GPlot(this);
+  tempPlot.setPos(windowGrid[0][1].x - winWidth/2f, windowGrid[0][1].y - winHeight/2f);
+  tempPlot.setMar(60,60,40,40);
+  tempPlot.setDim(winWidth - 100, winHeight - 100);
+  tempPlot.setTitleText("Temperature-time");
+  tempPlot.getXAxis().setAxisLabelText("Time (frame)");
+  tempPlot.getYAxis().setAxisLabelText("Temperature");
+  
+  collPlot = new GPlot(this);
+  collPlot.setPos(windowGrid[1][1].x - winWidth/2f, windowGrid[1][1].y - winHeight/2f);
+  collPlot.setMar(60,60,40,40);
+  collPlot.setDim(winWidth - 100, winHeight - 100);
+  collPlot.setTitleText("Collisions-time");
+  collPlot.getXAxis().setAxisLabelText("Time (frame)");
+  collPlot.getYAxis().setAxisLabelText("Number of collisions per frame");
+
+  velScatter = new GPlot(this);
+  velScatter.setPos(windowGrid[0][2].x - winWidth/2f, windowGrid[0][2].y - winHeight/2f);
+  velScatter.setMar(60,60,40,40);
+  velScatter.setDim(winWidth - 100, winHeight - 100);
+  velScatter.setTitleText("Velocity-Temperature");
+  velScatter.getXAxis().setAxisLabelText("Temperature");
+  velScatter.getYAxis().setAxisLabelText("Most frequent velocity (px/frame)");
+  
+  freqScatter = new GPlot(this);
+  freqScatter.setPos(windowGrid[1][2].x - winWidth/2f, windowGrid[1][2].y - winHeight/2f);
+  freqScatter.setMar(60,60,40,40);
+  freqScatter.setDim(winWidth - 100, winHeight - 100);
+  freqScatter.setTitleText("Frequency of the modal velocity");
+  freqScatter.getXAxis().setAxisLabelText("Time (frame)");
+  freqScatter.getYAxis().setAxisLabelText("Number particles");
+  freqScatter.setYLim(0, N);
 }
 
 void draw() {
   background(0);
+
   pushMatrix();
-  translate(systemX, systemY);
+  translate(windowGrid[0][0].x, windowGrid[0][0].y);
+
   
   // Time delta between this frame and the last
   float timestep = 1;
-  
-  //float winX = frame.getX();
-  //float winY = frame.getY();
-  //dWinX = winX - pWinX;
-  //dWinY = winY - pWinY;
-  //pWinX = winX;
-  //pWinY = winY;
-  
-  //translate(winOriginX-winX, winOriginY-winY);
-  
+    
   numCollisions = 0;
   // Check for collisions, then re-position and re-direct particles as necessary
   for (Particle pA : particles) {
@@ -103,7 +160,6 @@ void draw() {
 
   // For particles that didn't collide, continue their trajectory
   for (Particle p : particles) {
-    //p.update(dWinX, dWinY, -(winOriginX-winX), -(winOriginY-winY));
     p.update(systemBox);
   }
   
@@ -116,27 +172,90 @@ void draw() {
   
   popMatrix();
   
-  updatePlot(50);
+  updateHistogram(100);
   
-  plot.beginDraw();
-  plot.drawBackground();
-  plot.drawBox();
-  plot.drawXAxis();
-  plot.drawYAxis();
-  plot.drawTitle();
-  plot.drawHistograms();
-  plot.endDraw();
+  // Draw the histogram
+  velHist.beginDraw();
+  velHist.drawBackground();
+  velHist.drawBox();
+  velHist.drawXAxis();
+  velHist.drawYAxis();
+  velHist.drawTitle();
+  velHist.drawHistograms();
+  velHist.endDraw();
+
+  // Overlay Maxwellian distribution
+  maxwellPlot.beginDraw();
+  //velHist.drawBackground();
+  //velHist.drawBox();
+  //velHist.drawXAxis();
+  maxwellPlot.drawRightAxis();
+  //velHist.drawTitle();
+  //velHist.drawHistograms();
+  maxwellPlot.drawLines();
+  maxwellPlot.endDraw();
+
+  
+  
+  // Draw the temperature-time plot
+  tempPlot.beginDraw();
+  tempPlot.drawBackground();
+  tempPlot.drawBox();
+  tempPlot.drawXAxis();
+  tempPlot.drawYAxis();
+  tempPlot.drawTitle();
+  tempPlot.drawGridLines(GPlot.BOTH);
+  tempPlot.drawLines();
+  tempPlot.endDraw();
+  
+  // Draw the collision-time plot
+  collPlot.beginDraw();
+  collPlot.drawBackground();
+  collPlot.drawBox();
+  collPlot.drawXAxis();
+  collPlot.drawYAxis();
+  collPlot.drawTitle();
+  collPlot.drawGridLines(GPlot.BOTH);
+  collPlot.drawLines();
+  collPlot.endDraw();
+  
+  // Draw the peak velocity over time plot
+  velScatter.beginDraw();
+  velScatter.drawBackground();
+  velScatter.drawBox();
+  velScatter.drawXAxis();
+  velScatter.drawYAxis();
+  velScatter.drawTitle();
+  velScatter.drawGridLines(GPlot.BOTH);
+  velScatter.drawPoints();
+  velScatter.endDraw();
+
+  // Draw the peak frequency over time plot
+  freqScatter.beginDraw();
+  freqScatter.drawBackground();
+  freqScatter.drawBox();
+  freqScatter.drawXAxis();
+  freqScatter.drawYAxis();
+  freqScatter.drawTitle();
+  freqScatter.drawGridLines(GPlot.BOTH);
+  freqScatter.drawPoints();
+  freqScatter.endDraw();
 }
 
 void keyPressed() {
   if (key == ' ') {
-    systemBox.update(-290, -290, 290, 290);
+    // Enlarge system box when space is pressed
+    systemBox.update(0, 0, winWidth, winHeight);
   }
 }
 
 void mouseInfluence() {
   float strength = 4;
-  PVector mouse = new PVector(mouseX-systemX, mouseY-systemY);
+  PVector mouse = new PVector(mouseX-windowGrid[0][0].x, mouseY-windowGrid[0][0].y);
+  
+  // Clicking only works within the system window
+  if (abs(mouse.x) >= winWidth/2f) return;
+  if (abs(mouse.y) >= winHeight/2f) return;
   
   if (mouseButton == LEFT) {
     for (Particle p : particles) {
@@ -150,31 +269,98 @@ void mouseInfluence() {
   }
 }
 
-void updatePlot(int numBins) {
+void updateHistogram(int numBins) {
   float min = 0;
   float max = 10;
   float binWidth = (max - min) / numBins;
-  // Get particle speeds and determine maximum
   
   float[] counts = new float[numBins];
   
+  // average kinetic energy
+  float aveKE = 0;
+  
   for (Particle p : particles) {
     float speed = p.vel.mag();
+    
+    // Discretise speed into bins and count frequency
     int binIndex = (int) ((speed - min) / binWidth);
     if (binIndex >= 0 && binIndex < numBins) {
       counts[binIndex] += 1;
     } else {
       println("WARNING: bin index out of range (", binIndex, ") for velocity: ", speed);
     }
-  }
-  
-  // Plot the distribution
-  
-  GPointsArray points = new GPointsArray(particles.length);
     
-  for (int i = 0; i < counts.length; i++) {
-    points.add(min + i*binWidth, counts[i]);
+    aveKE += 0.5*p.mass*speed*speed;
   }
   
-  plot.setPoints(points);
+  aveKE /= particles.length;
+  float temperature = aveKE / BoltzmannConstant;  // For 2D monatomic particles with 2 degrees of freedom
+  
+  // Plot the speed distribution
+  GPointsArray histSeries = new GPointsArray(particles.length);
+  
+  int particlesCounted = 0;
+    
+  float highestFrequency = 0;
+  float modalVelocity = 0;
+  for (int i = 0; i < counts.length; i++) {
+    // Offset bins by 0.5 because (int) casting floors all velocities down. So the correct median for that bin is actually half of a bin's width extra
+    float velocity = min + (i+0.5)*binWidth;
+    float probability = counts[i]/2000/binWidth;
+    histSeries.add(velocity, probability);
+    
+    if (counts[i] > highestFrequency) {
+      highestFrequency = counts[i];
+      modalVelocity = velocity;
+    }
+    
+    particlesCounted += counts[i];
+  }
+  //println("Area under histogram: ", particlesCounted);
+  
+  velHist.setPoints(histSeries);
+  
+  // Plot Maxwellian distribution
+  int numVels = 100;
+  GPointsArray maxwellian = new GPointsArray(numVels);
+
+  float dv = (max - min) / numVels;
+  float area = 0;
+  for (float v = min; v < max; v += dv) {
+    float probV = probability2D(v, temperature, particles[0].mass);
+    maxwellian.add(v, probV);
+    
+    area += probV * dv;
+  }
+  //println("Area under maxwellian: ", area);
+  maxwellPlot.setPoints(maxwellian);
+  
+  
+  // Plot temperature over time
+  tempPlot.addPoint(frameCount, temperature);
+  
+  // Plot collisions over time
+  collPlot.addPoint(frameCount, numCollisions);
+  
+  // Plot modal velocity over time
+  velScatter.addPoint(temperature, modalVelocity);
+  
+  // Plot frequency of modal velocity
+  freqScatter.addPoint(temperature, highestFrequency);
+}
+
+// Used to plot the theoretical Maxwell velocity distribution
+public float probability3D(float velocity, float temperature, float mass) {
+  float normalisation_constant = pow(mass / (2*PI*BoltzmannConstant*temperature), 1.5);
+  float velocity_term = 4*PI*velocity*velocity;
+  float exponential_term = exp(- (mass*velocity*velocity) / (2*BoltzmannConstant*temperature));
+  return normalisation_constant * velocity_term * exponential_term;
+}
+
+// Used to plot the theoretical Maxwell velocity distribution
+public float probability2D(float velocity, float temperature, float mass) {
+  float normalisation_constant = (mass / (BoltzmannConstant*temperature));
+  float velocity_term = velocity;
+  float exponential_term = exp(- (mass*velocity*velocity) / (2*BoltzmannConstant*temperature));
+  return normalisation_constant * velocity_term * exponential_term;
 }
