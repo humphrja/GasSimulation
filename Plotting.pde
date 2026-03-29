@@ -6,9 +6,10 @@ public void createPlots(int numberParticles) {
   velHist.setMar(60,60,50,60);
   // Plot dimensions only
   velHist.setDim(winWidth - 120, winHeight - 110);
-  velHist.setYLim(0, 1);
+  velHist.setYLim(0, 1.5);
     
   String title = String.format("Comparing simulated and theoretical\nvelocity distributions for %d particles.", numberParticles);
+  //String title = String.format("Comparing simulated and theoretical\nvelocity distributions for %d particles\nat temperature = %d", numberParticles);
   velHist.setTitleText(title);
   velHist.getXAxis().setAxisLabelText("Particle velocity (px/frame)");
   velHist.getYAxis().setAxisLabelText("Relative frequency per velocity bin (frame/px)");
@@ -19,9 +20,9 @@ public void createPlots(int numberParticles) {
   maxwellPlot.setPos(velHist.getPos());
   maxwellPlot.setMar(velHist.getMar());
   maxwellPlot.setDim(velHist.getDim());
-  maxwellPlot.getRightAxis().setAxisLabelText("Theoretical Probability");
+  maxwellPlot.getRightAxis().setAxisLabelText("Theoretical probability");
   maxwellPlot.getRightAxis().setDrawTickLabels(true);
-  maxwellPlot.setYLim(0,1);
+  maxwellPlot.setYLim(velHist.getYLim());
   maxwellPlot.setXLim(velHist.getXLim());
   
   
@@ -32,16 +33,16 @@ public void createPlots(int numberParticles) {
   tempPlot.setPos(windowGrid[0][1].x - winWidth/2f, windowGrid[0][1].y - winHeight/2f);
   tempPlot.setMar(60,60,40,40);
   tempPlot.setDim(winWidth - 100, winHeight - 100);
-  tempPlot.setTitleText("System temperature record");
+  tempPlot.setTitleText("System temperature record.");
   tempPlot.getXAxis().setAxisLabelText("Time (frame)");
-  tempPlot.getYAxis().setAxisLabelText("Temperature");
+  tempPlot.getYAxis().setAxisLabelText("Temperature (K*)");
   
   // No. collisions per frame over time
   collPlot = new GPlot(this);
   collPlot.setPos(windowGrid[1][1].x - winWidth/2f, windowGrid[1][1].y - winHeight/2f);
   collPlot.setMar(60,60,40,40);
   collPlot.setDim(winWidth - 100, winHeight - 100);
-  collPlot.setTitleText("Collisions-time");
+  collPlot.setTitleText("Particle-particle collision record.");
   collPlot.getXAxis().setAxisLabelText("Time (frame)");
   collPlot.getYAxis().setAxisLabelText("Number of collisions per frame (1/frame)");
 
@@ -50,8 +51,8 @@ public void createPlots(int numberParticles) {
   velScatter.setPos(windowGrid[0][2].x - winWidth/2f, windowGrid[0][2].y - winHeight/2f);
   velScatter.setMar(60,60,40,40);
   velScatter.setDim(winWidth - 100, winHeight - 100);
-  velScatter.setTitleText("Comparing most probable velocity with system temperature");
-  velScatter.getXAxis().setAxisLabelText("Temperature");
+  velScatter.setTitleText("Comparing most probable velocity with system temperature.");
+  velScatter.getXAxis().setAxisLabelText("Temperature (K*)");
   velScatter.getYAxis().setAxisLabelText("Modal velocity (px/frame)");
   
   // Relative frequency 
@@ -59,14 +60,14 @@ public void createPlots(int numberParticles) {
   freqScatter.setPos(windowGrid[1][2].x - winWidth/2f, windowGrid[1][2].y - winHeight/2f);
   freqScatter.setMar(60,60,50,40);
   freqScatter.setDim(winWidth - 100, winHeight - 110);
-  freqScatter.setTitleText("Proportion of particles occupying\nthe highest frequency velocity bin");
-  freqScatter.getXAxis().setAxisLabelText("Temperature");
+  freqScatter.setTitleText("Proportion of particles occupying\nthe highest frequency velocity bin.");
+  freqScatter.getXAxis().setAxisLabelText("Temperature (K*)");
   freqScatter.getYAxis().setAxisLabelText("Relative frequency per velocity bin (frame/px)");
 }
 
 void updatePlots(int numBins) {
   float min = 0;
-  float max = 10;
+  float max = 20;
   float binWidth = (max - min) / numBins;
   
   float[] counts = new float[numBins];
@@ -82,7 +83,7 @@ void updatePlots(int numBins) {
     if (binIndex >= 0 && binIndex < numBins) {
       counts[binIndex] += 1;
     } else {
-      println("WARNING: bin index out of range (", binIndex, ") for velocity: ", speed);
+      //println("WARNING: bin index out of range (", binIndex, ") for velocity: ", speed);
     }
     
     aveKE += 0.5*p.mass*speed*speed;
@@ -101,7 +102,7 @@ void updatePlots(int numBins) {
   for (int i = 0; i < counts.length; i++) {
     // Offset bins by 0.5 because (int) casting floors all velocities down. So the correct median for that bin is actually half of a bin's width extra
     float velocity = min + (i+0.5)*binWidth;
-    float probability = counts[i]/2000/binWidth;
+    float probability = counts[i]/particles.length/binWidth;
     histSeries.add(velocity, probability);
     
     if (counts[i] > highestFrequency) {
